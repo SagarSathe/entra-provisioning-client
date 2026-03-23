@@ -111,7 +111,12 @@ The wizard guides you through **6 steps**:
 
 ### Step 1 — Connect
 
-Enter your Microsoft Entra ID app registration details:
+Choose a **Provisioning Target** and enter your Microsoft Entra ID app registration details:
+
+| Provisioning Target | Description |
+|---|---|
+| **Microsoft Entra ID** (default) | Provision users to cloud-based Entra ID |
+| **On-premises Active Directory** | Provision users to on-prem AD via the Entra Cloud Sync provisioning agent |
 
 | Field | Where to find it |
 |---|---|
@@ -122,6 +127,8 @@ Enter your Microsoft Entra ID app registration details:
 
 > The API endpoint looks like:  
 > `https://graph.microsoft.com/beta/servicePrincipals/{id}/synchronization/jobs/{jobId}/bulkUpload`
+
+> **On-prem AD note:** Ensure the Microsoft Entra Cloud Sync provisioning agent is installed on a domain-joined server and that an API-driven provisioning to AD app is configured in the Entra admin center.
 
 ### Step 2 — Choose Data Source
 
@@ -150,6 +157,17 @@ Pick one:
 Map your source columns to SCIM attributes. Click **Auto-Map** to auto-detect common field names, or map manually with the dropdowns.
 
 At minimum, you must map **externalId** (a unique worker identifier).
+
+#### Custom SCIM Schema Extension
+
+Toggle the **Custom SCIM Schema Extension** option to send HR fields (e.g. HireDate, JobCode) that aren't part of the standard SCIM Core User schema.
+
+1. Enable the toggle and set the **Schema Namespace URI** (e.g. `urn:ietf:params:scim:schemas:extension:contoso:1.0:User`).
+2. Add custom attributes by name and type (`String`, `DateTime`, `Integer`, `Boolean`).
+3. Map each custom attribute to a source column — Auto-Map will also match custom attributes by name.
+4. Type coercion is applied automatically when building the SCIM payload (e.g. DateTime values are converted to ISO 8601).
+
+> Custom attributes must also be registered in your Entra provisioning app's schema. [Learn more](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/inbound-provisioning-api-custom-attributes).
 
 ### Step 5 — Preview
 
@@ -286,6 +304,17 @@ Before using this tool, you need an app registration in Microsoft Entra ID:
 7. Note your **Tenant ID**, **Client ID**, and the **Client Secret**
 8. Go to **Enterprise applications** → Your provisioning app → **Provisioning** → **Overview**
 9. Copy the **Provisioning API Endpoint** URL
+
+---
+
+## Recent Changes
+
+### Custom Attribute Mapping & UI Overhaul (latest)
+
+- **Custom SCIM schema extension** — Define custom attributes (name + type), map them to source columns, and include them in the SCIM bulk payload under a configurable namespace URI. Supports `String`, `DateTime`, `Integer`, and `Boolean` types with automatic coercion.
+- **Provisioning target selector** — Choose between **Microsoft Entra ID** (cloud) and **On-premises Active Directory** (via Entra Cloud Sync agent) directly from the Connect step.
+- **Session state persistence** — Wizard step, credentials, data-source selection, attribute mappings, and custom attributes are saved to `localStorage` so you can resume where you left off after a page refresh.
+- **Refreshed UI** — Updated stepper with step descriptions, improved layout and styling throughout.
 
 ---
 
