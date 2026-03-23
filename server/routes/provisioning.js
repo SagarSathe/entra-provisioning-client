@@ -16,7 +16,7 @@ router.post('/preview', (req, res) => {
       return res.status(400).json({ error: 'No CSV data uploaded. Please upload a file first.' });
     }
 
-    const { mapping, customSchemaNamespace, operationsPerRequest } = req.body;
+    const { mapping, customSchemaNamespace, operationsPerRequest, customAttributeTypes } = req.body;
     if (!mapping) {
       return res.status(400).json({ error: 'Attribute mapping is required.' });
     }
@@ -25,7 +25,8 @@ router.post('/preview', (req, res) => {
       csvData.rows,
       mapping,
       customSchemaNamespace || null,
-      operationsPerRequest || 50
+      operationsPerRequest || 50,
+      customAttributeTypes || null
     );
 
     res.json({
@@ -51,7 +52,7 @@ router.post('/send', async (req, res) => {
       return res.status(400).json({ error: 'No CSV data uploaded. Please upload a file first.' });
     }
 
-    const { mapping, config, customSchemaNamespace, operationsPerRequest } = req.body;
+    const { mapping, config, customSchemaNamespace, operationsPerRequest, customAttributeTypes } = req.body;
     if (!mapping) {
       return res.status(400).json({ error: 'Attribute mapping is required.' });
     }
@@ -64,7 +65,8 @@ router.post('/send', async (req, res) => {
       csvData.rows,
       mapping,
       customSchemaNamespace || null,
-      operationsPerRequest || 50
+      operationsPerRequest || 50,
+      customAttributeTypes || null
     );
 
     // Get access token

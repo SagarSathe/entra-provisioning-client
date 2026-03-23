@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { previewPayload } from '../services/api';
 
-export default function PayloadPreview({ mapping }) {
+export default function PayloadPreview({ mapping, customAttributes }) {
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -11,7 +11,7 @@ export default function PayloadPreview({ mapping }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await previewPayload(mapping);
+      const data = await previewPayload(mapping, customAttributes);
       setPreview(data);
       setActiveTab(0);
     } catch (err) {

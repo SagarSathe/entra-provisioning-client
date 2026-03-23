@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { getScimSchema, validateMapping } from '../services/api';
 
-export default function AttributeMapping({ csvHeaders, mapping, setMapping }) {
+export default function AttributeMapping({ csvHeaders, mapping, setMapping, customAttributes, setCustomAttributes }) {
   const [schema, setSchema] = useState(null);
   const [validation, setValidation] = useState(null);
+  const [newAttrName, setNewAttrName] = useState('');
+  const [newAttrType, setNewAttrType] = useState('string');
 
   useEffect(() => {
     getScimSchema().then(setSchema).catch(console.error);
@@ -18,6 +20,42 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping }) {
   const handleValidate = async () => {
     const result = await validateMapping(mapping);
     setValidation(result);
+  };
+
+  // --- Custom Attribute Helpers ---
+  const toggleCustomAttrs = () => {
+    setCustomAttributes({ ...customAttributes, enabled: !customAttributes.enabled });
+  };
+
+  const updateNamespace = (ns) => {
+    setCustomAttributes({ ...customAttributes, namespace: ns });
+  };
+
+  const addCustomAttribute = () => {
+    const trimmed = newAttrName.trim();
+    if (!trimmed) return;
+    // Prevent duplicates
+    if (customAttributes.attributes.some(a => a.name === trimmed)) return;
+    setCustomAttributes({
+      ...customAttributes,
+      attributes: [...customAttributes.attributes, { name: trimmed, type: newAttrType, description: '' }],
+    });
+    setNewAttrName('');
+    setNewAttrType('string');
+  };
+
+  const removeCustomAttribute = (name) => {
+    setCustomAttributes({
+      ...customAttributes,
+      attributes: customAttributes.attributes.filter(a => a.name !== name),
+    });
+    // Also remove the mapping for this custom attribute
+    const scimPath = `custom.${name}`;
+    if (mapping[scimPath]) {
+      const newMapping = { ...mapping };
+      delete newMapping[scimPath];
+      setMapping(newMapping);
+    }
   };
 
   const autoMap = () => {
@@ -60,6 +98,18 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping }) {
         if (idx >= 0) {
           newMapping[scimPath] = csvHeaders[idx];
           break;
+        }
+      }
+    }
+
+    // Auto-map custom attributes by name match
+    if (customAttributes.enabled) {
+      for (const attr of customAttributes.attributes) {
+        const scimPath = `custom.${attr.name}`;
+        if (newMapping[scimPath]) continue;
+        const idx = lowerHeaders.indexOf(attr.name.toLowerCase());
+        if (idx >= 0) {
+          newMapping[scimPath] = csvHeaders[idx];
         }
       }
     }
@@ -210,6 +260,116 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping }) {
             onChange={val => updateMapping(`enterprise.manager.${attr.name}`, val)}
           />
         ))}
+      </div>
+
+      {/* Custom SCIM Schema Extension */}
+      <div className="mapping-section custom-attrs-section">
+        <h3>
+          <label className="custom-attrs-toggle">
+            <input
+              type="radio"
+              name="customAttrsEnabled"
+              checked={customAttributes.enabled}
+              onClick={toggleCustomAttrs}
+              readOnly
+            />
+            Custom SCIM Schema Extension
+          </label>
+        </h3>
+
+        {customAttributes.enabled && (
+          <div className="custom-attrs-config">
+            <div className="alert alert-info" style={{ marginBottom: 16 }}>
+              <span>ℹ️</span>
+              <div>
+                <strong>Custom attributes</strong> let you send HR fields (e.g. HireDate, JobCode) that aren't part of the standard SCIM schema.
+                These must also be registered in your Entra provisioning app's schema.{' '}
+                <a href="https://learn.microsoft.com/en-us/entra/identity/app-provisioning/inbound-provisioning-api-custom-attributes"
+                   target="_blank" rel="noopener noreferrer">Learn more</a>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Schema Namespace URI</label>
+              <div className="hint">
+                The SCIM schema extension namespace (e.g. urn:ietf:params:scim:schemas:extension:contoso:1.0:User)
+              </div>
+              <input
+                type="text"
+                placeholder="urn:ietf:params:scim:schemas:extension:contoso:1.0:User"
+                value={customAttributes.namespace}
+                onChange={e => updateNamespace(e.target.value)}
+              />
+            </div>
+
+            {/* Add new attribute form */}
+            <div className="custom-attr-add-row">
+              <input
+                type="text"
+                placeholder="Attribute name (e.g. HireDate)"
+                value={newAttrName}
+                onChange={e => setNewAttrName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addCustomAttribute(); }}
+                className="custom-attr-name-input"
+              />
+              <select
+                value={newAttrType}
+                onChange={e => setNewAttrType(e.target.value)}
+                className="custom-attr-type-select"
+              >
+                <option value="string">String</option>
+                <option value="dateTime">DateTime</option>
+                <option value="integer">Integer</option>
+                <option value="boolean">Boolean</option>
+              </select>
+              <button className="btn btn-primary" onClick={addCustomAttribute} disabled={!newAttrName.trim()}>
+                + Add
+              </button>
+            </div>
+
+            {/* List of custom attributes with mapping */}
+            {customAttributes.attributes.length > 0 && (
+              <div className="custom-attrs-list">
+                {customAttributes.attributes.map(attr => (
+                  <div key={attr.name} className="mapping-row custom-attr-row">
+                    <div className="mapping-label">
+                      <span className="attr-name">{attr.name}</span>
+                      <span className="custom-attr-type-badge">{attr.type}</span>
+                      <div className="attr-desc">{customAttributes.namespace}:{attr.name}</div>
+                    </div>
+                    <div className="arrow">→</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <select
+                        value={mapping[`custom.${attr.name}`] || ''}
+                        onChange={e => updateMapping(`custom.${attr.name}`, e.target.value)}
+                        style={{ flex: 1 }}
+                      >
+                        <option value="">— Not mapped —</option>
+                        {csvHeaders.map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => removeCustomAttribute(attr.name)}
+                        style={{ padding: '4px 10px', fontSize: 12 }}
+                        title="Remove attribute"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {customAttributes.attributes.length === 0 && (
+              <div className="custom-attrs-empty">
+                No custom attributes added yet. Use the form above to add attributes like HireDate, JobCode, etc.
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

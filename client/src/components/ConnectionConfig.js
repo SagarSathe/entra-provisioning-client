@@ -20,6 +20,40 @@ export default function ConnectionConfig({ config, setConfig }) {
         </div>
       </div>
 
+      {/* Provisioning Target */}
+      <div className="form-group">
+        <label>Provisioning Target</label>
+        <div className="hint">Choose where users will be provisioned</div>
+        <div className="target-selector">
+          <label className={`target-option ${(config.provisioningTarget || 'entraId') === 'entraId' ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="provisioningTarget"
+              value="entraId"
+              checked={(config.provisioningTarget || 'entraId') === 'entraId'}
+              onChange={e => update('provisioningTarget', e.target.value)}
+            />
+            <div>
+              <strong>Microsoft Entra ID</strong>
+              <span>Provision users to cloud-based Entra ID (Azure AD)</span>
+            </div>
+          </label>
+          <label className={`target-option ${config.provisioningTarget === 'activeDirectory' ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="provisioningTarget"
+              value="activeDirectory"
+              checked={config.provisioningTarget === 'activeDirectory'}
+              onChange={e => update('provisioningTarget', e.target.value)}
+            />
+            <div>
+              <strong>On-premises Active Directory</strong>
+              <span>Provision users to on-prem AD via Entra cloud sync provisioning agent</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <div className="alert alert-info">
         <span>ℹ️</span>
         <div>
@@ -28,6 +62,9 @@ export default function ConnectionConfig({ config, setConfig }) {
             <li><strong>Tenant ID</strong> — Entra admin center → Overview → Tenant ID</li>
             <li><strong>Client ID & Secret</strong> — App registrations → Your app → Overview / Certificates & secrets</li>
             <li><strong>API Endpoint</strong> — Enterprise apps → Your provisioning app → Provisioning → Overview → Provisioning API Endpoint</li>
+            {config.provisioningTarget === 'activeDirectory' && (
+              <li><strong>Note:</strong> For on-prem AD, ensure Entra Cloud Sync provisioning agent is installed and configured</li>
+            )}
           </ul>
         </div>
       </div>
@@ -78,7 +115,11 @@ export default function ConnectionConfig({ config, setConfig }) {
 
       <div className="form-group">
         <label>Provisioning API Endpoint</label>
-        <div className="hint">The bulkUpload API endpoint URL from your provisioning app</div>
+        <div className="hint">
+          {config.provisioningTarget === 'activeDirectory'
+            ? 'The bulkUpload API endpoint URL from your API-driven provisioning to on-premises AD app'
+            : 'The bulkUpload API endpoint URL from your provisioning app'}
+        </div>
         <input
           type="url"
           placeholder="https://graph.microsoft.com/beta/servicePrincipals/{id}/synchronization/jobs/{jobId}/bulkUpload"
@@ -86,6 +127,20 @@ export default function ConnectionConfig({ config, setConfig }) {
           onChange={e => update('endpoint', e.target.value)}
         />
       </div>
+
+      {config.provisioningTarget === 'activeDirectory' && (
+        <div className="alert alert-warning" style={{ marginTop: 0 }}>
+          <span>⚠️</span>
+          <div>
+            <strong>On-premises AD provisioning requires:</strong>
+            <ul style={{ marginTop: 4, paddingLeft: 20, fontSize: 13 }}>
+              <li>Microsoft Entra Cloud Sync provisioning agent installed on a domain-joined server</li>
+              <li>API-driven provisioning to AD app configured in Entra admin center</li>
+              <li>The provisioning agent must be running and connected</li>
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

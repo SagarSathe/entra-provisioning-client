@@ -12,14 +12,15 @@ const {
  * @param {Object} mapping - Attribute mapping config: { scimAttribute: csvColumn, ... }
  * @param {string} [customSchemaNamespace] - Optional custom SCIM schema namespace
  * @param {number} [operationsPerRequest=50] - Max operations per bulk request
+ * @param {Object} [customAttributeTypes] - Optional type map: { attrName: 'string'|'dateTime'|'integer'|'boolean' }
  * @returns {Object[]} Array of SCIM BulkRequest payloads
  */
-function buildScimBulkPayloads(rows, mapping, customSchemaNamespace = null, operationsPerRequest = 50) {
+function buildScimBulkPayloads(rows, mapping, customSchemaNamespace = null, operationsPerRequest = 50, customAttributeTypes = null) {
   const payloads = [];
   let currentOps = [];
 
   for (const row of rows) {
-    const userData = buildUserData(row, mapping, customSchemaNamespace);
+    const userData = buildUserData(row, mapping, customSchemaNamespace, customAttributeTypes);
     const operation = {
       method: 'POST',
       bulkId: uuidv4(),
@@ -52,7 +53,7 @@ function wrapBulkRequest(operations) {
 /**
  * Build a single SCIM user data object from a CSV row using the mapping.
  */
-function buildUserData(row, mapping, customSchemaNamespace) {
+function buildUserData(row, mapping, customSchemaNamespace, customAttributeTypes) {
   const schemas = [SCIM_CORE_USER_SCHEMA];
   const data = { schemas };
 
@@ -81,7 +82,9 @@ function buildUserData(row, mapping, customSchemaNamespace) {
       if (!data[ns]) {
         data[ns] = {};
       }
-      data[ns][attrName] = value;
+      // Apply type coercion for custom attributes
+      const attrType = customAttributeTypes && customAttributeTypes[attrName];
+      data[ns][attrName] = coerceCustomValue(value, attrType);
     } else if (scimPath === 'active') {
       // Handle boolean conversion
       data.active = toBool(value);
@@ -154,6 +157,24 @@ function toBool(val) {
     return lower === 'true' || lower === 'yes' || lower === '1' || lower === 'active';
   }
   return Boolean(val);
+}
+
+/**
+ * Coerce a custom attribute value based on declared type.
+ */
+function coerceCustomValue(value, type) {
+  if (!type || type === 'string') return String(value);
+  if (type === 'boolean') return toBool(value);
+  if (type === 'integer') {
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? value : parsed;
+  }
+  if (type === 'dateTime') {
+    // If already ISO format, keep it; otherwise try to parse
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? String(value) : d.toISOString();
+  }
+  return String(value);
 }
 
 module.exports = { buildScimBulkPayloads };

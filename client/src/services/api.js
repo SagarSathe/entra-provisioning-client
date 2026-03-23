@@ -22,21 +22,37 @@ export async function validateMapping(mapping) {
   return res.json();
 }
 
-export async function previewPayload(mapping, customSchemaNamespace) {
+export async function previewPayload(mapping, customAttributes) {
+  const body = { mapping };
+  if (customAttributes?.enabled && customAttributes.namespace) {
+    body.customSchemaNamespace = customAttributes.namespace;
+    body.customAttributeTypes = {};
+    for (const attr of customAttributes.attributes) {
+      body.customAttributeTypes[attr.name] = attr.type;
+    }
+  }
   const res = await fetch(`${API_BASE}/api/provisioning/preview`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mapping, customSchemaNamespace }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error((await res.json()).error || 'Preview failed');
   return res.json();
 }
 
-export async function sendToApi(mapping, config, customSchemaNamespace) {
+export async function sendToApi(mapping, config, customAttributes) {
+  const body = { mapping, config };
+  if (customAttributes?.enabled && customAttributes.namespace) {
+    body.customSchemaNamespace = customAttributes.namespace;
+    body.customAttributeTypes = {};
+    for (const attr of customAttributes.attributes) {
+      body.customAttributeTypes[attr.name] = attr.type;
+    }
+  }
   const res = await fetch(`${API_BASE}/api/provisioning/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mapping, config, customSchemaNamespace }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json();

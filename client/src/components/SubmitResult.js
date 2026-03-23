@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { sendToApi } from '../services/api';
 
-export default function SubmitResult({ mapping, config }) {
+export default function SubmitResult({ mapping, config, customAttributes }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState(null);
@@ -17,7 +17,7 @@ export default function SubmitResult({ mapping, config }) {
     setResults(null);
 
     try {
-      const data = await sendToApi(mapping, config);
+      const data = await sendToApi(mapping, config, customAttributes);
       setResults(data);
     } catch (err) {
       setError(err.message);
@@ -74,7 +74,7 @@ export default function SubmitResult({ mapping, config }) {
             <details style={{ marginTop: 16 }}>
               <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>View API Response Details</summary>
               <pre style={{
-                background: '#1e1e1e', color: '#d4d4d4', padding: 16,
+                background: 'var(--code-bg)', color: 'var(--code-text)', padding: 16,
                 borderRadius: 8, marginTop: 8, fontSize: 12, overflow: 'auto', maxHeight: 400
               }}>
                 {JSON.stringify(results.results, null, 2)}
