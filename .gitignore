@@ -10,3 +10,14 @@ uploads/
 .DS_Store
 package-lock.json
 client/package-lock.json
+
+# Certificates and keys
+*.pem
+*.crt
+*.cer
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
+certs/

@@ -6,6 +6,7 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
   const [validation, setValidation] = useState(null);
   const [newAttrName, setNewAttrName] = useState('');
   const [newAttrType, setNewAttrType] = useState('string');
+  const [newAttrTarget, setNewAttrTarget] = useState('');
 
   useEffect(() => {
     getScimSchema().then(setSchema).catch(console.error);
@@ -38,10 +39,11 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
     if (customAttributes.attributes.some(a => a.name === trimmed)) return;
     setCustomAttributes({
       ...customAttributes,
-      attributes: [...customAttributes.attributes, { name: trimmed, type: newAttrType, description: '' }],
+      attributes: [...customAttributes.attributes, { name: trimmed, type: newAttrType, targetAttribute: newAttrTarget.trim() || '', description: '' }],
     });
     setNewAttrName('');
     setNewAttrType('string');
+    setNewAttrTarget('');
   };
 
   const removeCustomAttribute = (name) => {
@@ -283,7 +285,8 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
               <span>ℹ️</span>
               <div>
                 <strong>Custom attributes</strong> let you send HR fields (e.g. HireDate, JobCode) that aren't part of the standard SCIM schema.
-                These must also be registered in your Entra provisioning app's schema.{' '}
+                When you specify a <strong>Target Entra Attribute</strong>, the app will automatically update your provisioning job's schema
+                and configure the attribute mapping — no need to edit anything in the Entra portal.{' '}
                 <a href="https://learn.microsoft.com/en-us/entra/identity/app-provisioning/inbound-provisioning-api-custom-attributes"
                    target="_blank" rel="noopener noreferrer">Learn more</a>
               </div>
@@ -322,6 +325,15 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
                 <option value="integer">Integer</option>
                 <option value="boolean">Boolean</option>
               </select>
+              <input
+                type="text"
+                placeholder="Target Entra attribute (e.g. employeeHireDate)"
+                value={newAttrTarget}
+                onChange={e => setNewAttrTarget(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addCustomAttribute(); }}
+                className="custom-attr-name-input"
+                style={{ minWidth: 200 }}
+              />
               <button className="btn btn-primary" onClick={addCustomAttribute} disabled={!newAttrName.trim()}>
                 + Add
               </button>
@@ -336,27 +348,48 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
                       <span className="attr-name">{attr.name}</span>
                       <span className="custom-attr-type-badge">{attr.type}</span>
                       <div className="attr-desc">{customAttributes.namespace}:{attr.name}</div>
+                      {attr.targetAttribute && (
+                        <div className="attr-desc" style={{ color: 'var(--success)', marginTop: 2 }}>
+                          → Entra: <strong>{attr.targetAttribute}</strong>
+                        </div>
+                      )}
                     </div>
                     <div className="arrow">→</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <select
-                        value={mapping[`custom.${attr.name}`] || ''}
-                        onChange={e => updateMapping(`custom.${attr.name}`, e.target.value)}
-                        style={{ flex: 1 }}
-                      >
-                        <option value="">— Not mapped —</option>
-                        {csvHeaders.map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => removeCustomAttribute(attr.name)}
-                        style={{ padding: '4px 10px', fontSize: 12 }}
-                        title="Remove attribute"
-                      >
-                        ✕
-                      </button>
+                    <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <select
+                          value={mapping[`custom.${attr.name}`] || ''}
+                          onChange={e => updateMapping(`custom.${attr.name}`, e.target.value)}
+                          style={{ flex: 1 }}
+                        >
+                          <option value="">— CSV column —</option>
+                          {csvHeaders.map(h => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => removeCustomAttribute(attr.name)}
+                          style={{ padding: '4px 10px', fontSize: 12 }}
+                          title="Remove attribute"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Target Entra attribute (e.g. jobTitle)"
+                        value={attr.targetAttribute || ''}
+                        onChange={e => {
+                          setCustomAttributes({
+                            ...customAttributes,
+                            attributes: customAttributes.attributes.map(a =>
+                              a.name === attr.name ? { ...a, targetAttribute: e.target.value } : a
+                            ),
+                          });
+                        }}
+                        style={{ fontSize: 13 }}
+                      />
                     </div>
                   </div>
                 ))}

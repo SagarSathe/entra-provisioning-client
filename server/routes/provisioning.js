@@ -1,6 +1,7 @@
 const express = require('express');
 const { buildScimBulkPayloads } = require('../services/scimBuilder');
 const { getAccessToken, sendBulkUpload } = require('../services/entraAuth');
+const { parseEndpointIds } = require('../services/schemaUpdater');
 
 const router = express.Router();
 
@@ -56,8 +57,16 @@ router.post('/send', async (req, res) => {
     if (!mapping) {
       return res.status(400).json({ error: 'Attribute mapping is required.' });
     }
-    if (!config || !config.tenantId || !config.clientId || !config.clientSecret || !config.endpoint) {
-      return res.status(400).json({ error: 'Connection configuration is incomplete. Provide tenantId, clientId, clientSecret, and endpoint.' });
+    if (!config || !config.endpoint) {
+      return res.status(400).json({ error: 'Connection configuration is incomplete. Provide at least an endpoint.' });
+    }
+
+    const authMethod = config.authMethod || 'certificate';
+    if (authMethod === 'certificate' && (!config.tenantId || !config.clientId || !config.certificatePath)) {
+      return res.status(400).json({ error: 'Certificate auth requires tenantId, clientId, and certificate file path.' });
+    }
+    if (authMethod === 'clientSecret' && (!config.tenantId || !config.clientId || !config.clientSecret)) {
+      return res.status(400).json({ error: 'Client secret auth requires tenantId, clientId, and clientSecret.' });
     }
 
     // Build payloads
@@ -72,7 +81,13 @@ router.post('/send', async (req, res) => {
     // Get access token
     let accessToken;
     try {
-      accessToken = await getAccessToken(config.tenantId, config.clientId, config.clientSecret);
+      accessToken = await getAccessToken(config.tenantId, config.clientId, config.clientSecret, {
+        authMethod: config.authMethod || 'certificate',
+        certificatePath: config.certificatePath,
+        certificatePassword: config.certificatePassword,
+        sendCertificateChain: config.sendCertificateChain,
+        managedIdentityClientId: config.managedIdentityClientId,
+      });
     } catch (authErr) {
       return res.status(401).json({
         error: `Authentication failed: ${authErr.message}`,
@@ -110,6 +125,88 @@ router.post('/send', async (req, res) => {
   } catch (err) {
     console.error('Send error:', err);
     res.status(500).json({ error: `Failed to send: ${err.message}` });
+  }
+});
+
+/**
+ * POST /api/provisioning/logs
+ * Fetch recent provisioning logs from Microsoft Graph audit logs.
+ * Body: { config: { tenantId, clientId, endpoint, authMethod, ... } }
+ */
+router.post('/logs', async (req, res) => {
+  try {
+    const { config } = req.body;
+    if (!config?.endpoint) {
+      return res.status(400).json({ error: 'Provisioning API endpoint is required.' });
+    }
+
+    let accessToken;
+    try {
+      accessToken = await getAccessToken(config.tenantId, config.clientId, config.clientSecret, {
+        authMethod: config.authMethod || 'certificate',
+        certificatePath: config.certificatePath,
+        certificatePassword: config.certificatePassword,
+        sendCertificateChain: config.sendCertificateChain,
+        managedIdentityClientId: config.managedIdentityClientId,
+      });
+    } catch (authErr) {
+      return res.status(401).json({
+        error: `Authentication failed: ${authErr.message}`,
+        details: 'Ensure your app registration has AuditLog.Read.All permission for reading provisioning logs.',
+      });
+    }
+
+    // Parse service principal ID from endpoint
+    const { servicePrincipalId } = parseEndpointIds(config.endpoint);
+
+    // Query provisioning logs from the last 30 minutes filtered by this service principal
+    const sinceTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const filter = encodeURIComponent(
+      `activityDateTime ge ${sinceTime} and servicePrincipal/id eq '${servicePrincipalId}'`
+    );
+    const url = `https://graph.microsoft.com/beta/auditLogs/provisioning?$filter=${filter}&$top=100&$orderby=activityDateTime desc`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Failed to fetch provisioning logs (${response.status}): ${body}`);
+    }
+
+    const data = await response.json();
+    const logs = (data.value || []).map(entry => ({
+      id: entry.id,
+      activityDateTime: entry.activityDateTime,
+      action: entry.provisioningAction,
+      status: entry.provisioningStatusInfo?.status || 'unknown',
+      errorDescription: entry.provisioningStatusInfo?.errorInformation?.errorDetail || null,
+      errorCode: entry.provisioningStatusInfo?.errorInformation?.errorCode || null,
+      sourceIdentity: entry.sourceIdentity?.displayName || entry.sourceIdentity?.id || null,
+      targetIdentity: entry.targetIdentity?.displayName || entry.targetIdentity?.id || null,
+      initiatedBy: entry.initiatedBy?.displayName || 'System',
+      jobId: entry.provisioningJobId || null,
+    }));
+
+    // Summarize
+    const summary = {
+      total: logs.length,
+      success: logs.filter(l => l.status === 'success').length,
+      failure: logs.filter(l => l.status === 'failure').length,
+      skipped: logs.filter(l => l.status === 'skipped').length,
+      warning: logs.filter(l => l.status === 'warning').length,
+      other: logs.filter(l => !['success', 'failure', 'skipped', 'warning'].includes(l.status)).length,
+    };
+
+    res.json({ summary, logs });
+  } catch (err) {
+    console.error('Provisioning logs error:', err);
+    res.status(500).json({ error: `Failed to fetch provisioning logs: ${err.message}` });
   }
 });
 

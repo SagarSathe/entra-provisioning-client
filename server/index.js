@@ -7,6 +7,7 @@ const uploadRoutes = require('./routes/upload');
 const mappingRoutes = require('./routes/mapping');
 const provisioningRoutes = require('./routes/provisioning');
 const connectorRoutes = require('./routes/connectors');
+const schemaRoutes = require('./routes/schema');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,6 +21,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/mapping', mappingRoutes);
 app.use('/api/provisioning', provisioningRoutes);
 app.use('/api/connectors', connectorRoutes);
+app.use('/api/schema', schemaRoutes);
 
 // Serve React frontend in production
 const clientBuildPath = path.join(__dirname, '..', 'client', 'build');

@@ -1,11 +1,53 @@
-const { ClientSecretCredential } = require('@azure/identity');
+const {
+  ClientSecretCredential,
+  ClientCertificateCredential,
+} = require('@azure/identity');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Acquire a bearer token for the Entra ID Provisioning API.
- * Uses client credentials flow (OAuth2).
+ * Supports two auth methods: certificate (primary), clientSecret (secondary).
  */
-async function getAccessToken(tenantId, clientId, clientSecret) {
-  const credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+async function getAccessToken(tenantId, clientId, clientSecret, authConfig) {
+  const authMethod = authConfig?.authMethod || 'certificate';
+  let credential;
+
+  switch (authMethod) {
+    case 'certificate': {
+      const certPath = authConfig.certificatePath;
+      if (!certPath) {
+        throw new Error('Certificate file path is required for certificate-based authentication.');
+      }
+      const resolvedPath = path.resolve(certPath);
+      if (!fs.existsSync(resolvedPath)) {
+        throw new Error(`Certificate file not found: ${resolvedPath}`);
+      }
+      const opts = {};
+      if (authConfig.certificatePassword) {
+        opts.certificatePassword = authConfig.certificatePassword;
+      }
+      if (authConfig.sendCertificateChain) {
+        opts.sendCertificateChain = true;
+      }
+      credential = new ClientCertificateCredential(tenantId, clientId, {
+        certificatePath: resolvedPath,
+        ...opts,
+      });
+      break;
+    }
+    case 'clientSecret': {
+      if (!clientSecret) {
+        throw new Error('Client secret is required for client secret authentication.');
+      }
+      credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+      break;
+    }
+    default: {
+      throw new Error(`Unsupported auth method: ${authMethod}. Use 'certificate' or 'clientSecret'.`);
+    }
+  }
+
   const tokenResponse = await credential.getToken('https://graph.microsoft.com/.default');
   return tokenResponse.token;
 }

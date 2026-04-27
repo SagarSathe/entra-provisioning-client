@@ -9,7 +9,13 @@
     "build": "cd client && npx react-scripts build",
     "install:all": "npm install && cd client && npm install"
   },
-  "keywords": ["entra", "provisioning", "scim", "inbound", "azure"],
+  "keywords": [
+    "entra",
+    "provisioning",
+    "scim",
+    "inbound",
+    "azure"
+  ],
   "license": "MIT",
   "dependencies": {
     "@azure/identity": "^4.2.0",
@@ -21,6 +27,8 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "node-forge": "^1.4.0",
+    "selfsigned": "^5.5.0"
   }
 }

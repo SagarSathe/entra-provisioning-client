@@ -35,12 +35,17 @@ export default function App() {
     }
     return 'light';
   });
-  const [config, setConfig] = useState(() => loadState('config', {
-    tenantId: '',
-    clientId: '',
-    clientSecret: '',
-    endpoint: '',
-  }));
+  const [config, setConfig] = useState(() => {
+    const saved = loadState('config', {
+      tenantId: '',
+      clientId: '',
+      endpoint: '',
+      authMethod: 'certificate',
+    });
+    // Migrate: default authMethod to certificate
+    if (!saved.authMethod || saved.authMethod === 'managedIdentity') saved.authMethod = 'certificate';
+    return saved;
+  });
   const [dataSource, setDataSource] = useState(() => loadState('dataSource', null));
   const [csvData, setCsvData] = useState(null);
   const [mapping, setMapping] = useState(() => loadState('mapping', {}));
@@ -66,7 +71,13 @@ export default function App() {
 
   const canProceed = (s) => {
     switch (s) {
-      case 0: return config.tenantId && config.clientId && config.clientSecret && config.endpoint;
+      case 0: {
+        if (!config.endpoint) return false;
+        const method = config.authMethod || 'certificate';
+        if (method === 'certificate') return !!(config.tenantId && config.clientId && config.certificatePath);
+        if (method === 'clientSecret') return !!(config.tenantId && config.clientId && config.clientSecret);
+        return false;
+      }
       case 1: return dataSource !== null;
       case 2: return csvData !== null;
       case 3: return Object.keys(mapping).length > 0 && mapping.externalId;

@@ -61,6 +61,36 @@ export async function sendToApi(mapping, config, customAttributes) {
   return res.json();
 }
 
+// ---- Schema Update API ----
+
+export async function updateProvisioningSchema(config, customAttributes) {
+  const res = await fetch(`${API_BASE}/api/schema/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config, customAttributes }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Schema update failed');
+  }
+  return res.json();
+}
+
+// ---- Provisioning Logs API ----
+
+export async function getProvisioningLogs(config) {
+  const res = await fetch(`${API_BASE}/api/provisioning/logs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to fetch provisioning logs');
+  }
+  return res.json();
+}
+
 // ---- HRMS Connector APIs ----
 
 export async function getConnectors() {

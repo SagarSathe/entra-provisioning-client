@@ -7,6 +7,8 @@ export default function ConnectionConfig({ config, setConfig }) {
     setConfig({ ...config, [field]: value });
   };
 
+  const authMethod = config.authMethod || 'certificate';
+
   return (
     <div className="card">
       <h2>Connection Configuration</h2>
@@ -54,13 +56,53 @@ export default function ConnectionConfig({ config, setConfig }) {
         </div>
       </div>
 
+      {/* Authentication Method */}
+      <div className="form-group">
+        <label>Authentication Method</label>
+        <div className="hint">Choose how this app authenticates with Microsoft Entra ID</div>
+        <div className="target-selector">
+          <label className={`target-option ${authMethod === 'certificate' ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="authMethod"
+              value="certificate"
+              checked={authMethod === 'certificate'}
+              onChange={e => update('authMethod', e.target.value)}
+            />
+            <div>
+              <strong>Certificate</strong>
+              <span>Authenticate with a certificate (.pem or .pfx) — more secure, no secret expiry</span>
+            </div>
+          </label>
+          <label className={`target-option ${authMethod === 'clientSecret' ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="authMethod"
+              value="clientSecret"
+              checked={authMethod === 'clientSecret'}
+              onChange={e => update('authMethod', e.target.value)}
+            />
+            <div>
+              <strong>Client Secret <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(Not recommended)</span></strong>
+              <span>Authenticate with a client secret from app registration</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <div className="alert alert-info">
         <span>ℹ️</span>
         <div>
           <strong>Where to find these values:</strong>
           <ul style={{ marginTop: 4, paddingLeft: 20, fontSize: 13 }}>
             <li><strong>Tenant ID</strong> — Entra admin center → Overview → Tenant ID</li>
-            <li><strong>Client ID & Secret</strong> — App registrations → Your app → Overview / Certificates & secrets</li>
+            <li><strong>Client ID</strong> — App registrations → Your app → Overview</li>
+            {authMethod === 'certificate' && (
+              <li><strong>Certificate</strong> — Upload .pem/.pfx to App registrations → Certificates & secrets → Certificates. Provide the local file path to the private key.</li>
+            )}
+            {authMethod === 'clientSecret' && (
+              <li><strong>Client Secret</strong> — App registrations → Your app → Certificates & secrets → Client secrets</li>
+            )}
             <li><strong>API Endpoint</strong> — Enterprise apps → Your provisioning app → Provisioning → Overview → Provisioning API Endpoint</li>
             {config.provisioningTarget === 'activeDirectory' && (
               <li><strong>Note:</strong> For on-prem AD, ensure Entra Cloud Sync provisioning agent is installed and configured</li>
@@ -91,27 +133,78 @@ export default function ConnectionConfig({ config, setConfig }) {
         />
       </div>
 
-      <div className="form-group">
-        <label>Client Secret</label>
-        <div className="hint">A client secret from your app registration</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            type={showSecret ? 'text' : 'password'}
-            placeholder="Enter client secret"
-            value={config.clientSecret || ''}
-            onChange={e => update('clientSecret', e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setShowSecret(!showSecret)}
-            style={{ whiteSpace: 'nowrap' }}
-          >
-            {showSecret ? 'Hide' : 'Show'}
-          </button>
+      {/* Certificate fields */}
+      {authMethod === 'certificate' && (
+        <>
+          <div className="form-group">
+            <label>Certificate File Path</label>
+            <div className="hint">Absolute path to the .pem or .pfx certificate file on this server (e.g. /certs/app.pem or C:\certs\app.pfx)</div>
+            <input
+              type="text"
+              placeholder="e.g. /home/user/certs/app-cert.pem"
+              value={config.certificatePath || ''}
+              onChange={e => update('certificatePath', e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Certificate Password <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(optional)</span></label>
+            <div className="hint">If the certificate is password-protected (.pfx), enter the password</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type={showSecret ? 'text' : 'password'}
+                placeholder="Certificate password (if any)"
+                value={config.certificatePassword || ''}
+                onChange={e => update('certificatePassword', e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowSecret(!showSecret)}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                {showSecret ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="custom-attrs-toggle" style={{ fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={config.sendCertificateChain || false}
+                onChange={e => update('sendCertificateChain', e.target.checked)}
+              />
+              Send certificate chain (x5c header)
+            </label>
+            <div className="hint">Enable if your Entra app is configured for Subject Name/Issuer (SNI) authentication</div>
+          </div>
+        </>
+      )}
+
+      {/* Client Secret fields */}
+      {authMethod === 'clientSecret' && (
+        <div className="form-group">
+          <label>Client Secret</label>
+          <div className="hint">A client secret from your app registration</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type={showSecret ? 'text' : 'password'}
+              placeholder="Enter client secret"
+              value={config.clientSecret || ''}
+              onChange={e => update('clientSecret', e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowSecret(!showSecret)}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {showSecret ? 'Hide' : 'Show'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="form-group">
         <label>Provisioning API Endpoint</label>
