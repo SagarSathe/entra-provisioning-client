@@ -6,24 +6,29 @@ const router = express.Router();
 
 /**
  * POST /api/schema/update
- * Ensure custom attributes exist in the provisioning job schema.
- * Automatically reads, patches, and updates the schema via Graph API.
+ * Ensure custom attributes AND standard attribute mappings exist in the
+ * provisioning job schema. Automatically reads, patches, and updates
+ * the schema via Graph API.
  *
- * Body: { config: { tenantId, clientId, clientSecret, endpoint, authMethod, ... }, customAttributes: { namespace, attributes } }
+ * Body: { config, customAttributes, mapping }
  */
 router.post('/update', async (req, res) => {
   try {
-    const { config, customAttributes } = req.body;
+    const { config, customAttributes, mapping } = req.body;
 
     if (!config?.endpoint) {
       return res.status(400).json({ error: 'Provisioning API endpoint is required.' });
     }
 
-    if (!customAttributes?.enabled || !customAttributes?.namespace || !customAttributes?.attributes?.length) {
+    const hasCustom = customAttributes?.enabled && customAttributes?.namespace && customAttributes?.attributes?.length;
+    const hasMapping = mapping && Object.keys(mapping).length > 0;
+
+    if (!hasCustom && !hasMapping) {
       return res.json({
         updated: false,
         attributesAdded: [],
-        message: 'No custom attributes to add to the schema.',
+        mappingsAdded: [],
+        message: 'No attributes or mappings to sync to the schema.',
       });
     }
 
@@ -44,7 +49,7 @@ router.post('/update', async (req, res) => {
       });
     }
 
-    const result = await ensureCustomSchemaAttributes(accessToken, config.endpoint, customAttributes);
+    const result = await ensureCustomSchemaAttributes(accessToken, config.endpoint, customAttributes, mapping);
     res.json(result);
   } catch (err) {
     console.error('Schema update error:', err);

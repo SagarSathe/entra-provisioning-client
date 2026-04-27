@@ -63,11 +63,11 @@ export async function sendToApi(mapping, config, customAttributes) {
 
 // ---- Schema Update API ----
 
-export async function updateProvisioningSchema(config, customAttributes) {
+export async function updateProvisioningSchema(config, customAttributes, mapping) {
   const res = await fetch(`${API_BASE}/api/schema/update`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ config, customAttributes }),
+    body: JSON.stringify({ config, customAttributes, mapping }),
   });
   if (!res.ok) {
     const err = await res.json();

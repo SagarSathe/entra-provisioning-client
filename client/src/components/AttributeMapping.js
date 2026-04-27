@@ -1,12 +1,68 @@
 import React, { useEffect, useState } from 'react';
 import { getScimSchema, validateMapping } from '../services/api';
 
+/**
+ * Common Entra ID / Azure AD target attributes available in provisioning mappings.
+ * Grouped by category for easy browsing in the dropdown.
+ */
+const ENTRA_TARGET_ATTRIBUTES = [
+  { group: 'Identity', attrs: [
+    { value: 'userPrincipalName', label: 'userPrincipalName — Sign-in name' },
+    { value: 'mailNickname', label: 'mailNickname — Mail alias' },
+    { value: 'displayName', label: 'displayName — Display name' },
+    { value: 'employeeId', label: 'employeeId — Employee ID' },
+    { value: 'employeeType', label: 'employeeType — Employee type (e.g. Contractor)' },
+    { value: 'employeeHireDate', label: 'employeeHireDate — Hire date' },
+    { value: 'employeeLeaveDateTime', label: 'employeeLeaveDateTime — Leave date' },
+    { value: 'employeeOrgData.division', label: 'employeeOrgData.division — Division' },
+    { value: 'employeeOrgData.costCenter', label: 'employeeOrgData.costCenter — Cost center' },
+  ]},
+  { group: 'Name', attrs: [
+    { value: 'givenName', label: 'givenName — First name' },
+    { value: 'surname', label: 'surname — Last name' },
+  ]},
+  { group: 'Job & Org', attrs: [
+    { value: 'jobTitle', label: 'jobTitle — Job title' },
+    { value: 'department', label: 'department — Department' },
+    { value: 'companyName', label: 'companyName — Company name' },
+    { value: 'manager', label: 'manager — Manager reference' },
+    { value: 'officeLocation', label: 'officeLocation — Office location' },
+  ]},
+  { group: 'Contact', attrs: [
+    { value: 'mail', label: 'mail — Email address' },
+    { value: 'otherMails', label: 'otherMails — Other email addresses' },
+    { value: 'telephoneNumber', label: 'telephoneNumber — Phone number' },
+    { value: 'mobile', label: 'mobile — Mobile phone' },
+    { value: 'facsimileTelephoneNumber', label: 'facsimileTelephoneNumber — Fax' },
+  ]},
+  { group: 'Address', attrs: [
+    { value: 'streetAddress', label: 'streetAddress — Street address' },
+    { value: 'city', label: 'city — City' },
+    { value: 'state', label: 'state — State / Province' },
+    { value: 'postalCode', label: 'postalCode — Postal code' },
+    { value: 'country', label: 'country — Country' },
+  ]},
+  { group: 'Account', attrs: [
+    { value: 'accountEnabled', label: 'accountEnabled — Account enabled (boolean)' },
+    { value: 'userType', label: 'userType — User type (Member/Guest)' },
+    { value: 'preferredLanguage', label: 'preferredLanguage — Preferred language' },
+    { value: 'usageLocation', label: 'usageLocation — Usage location' },
+  ]},
+  { group: 'Extension Attributes (on-prem AD)', attrs: [
+    ...Array.from({ length: 15 }, (_, i) => ({
+      value: `extensionAttribute${i + 1}`,
+      label: `extensionAttribute${i + 1}`,
+    })),
+  ]},
+];
+
 export default function AttributeMapping({ csvHeaders, mapping, setMapping, customAttributes, setCustomAttributes }) {
   const [schema, setSchema] = useState(null);
   const [validation, setValidation] = useState(null);
   const [newAttrName, setNewAttrName] = useState('');
   const [newAttrType, setNewAttrType] = useState('string');
   const [newAttrTarget, setNewAttrTarget] = useState('');
+  const [customTarget, setCustomTarget] = useState('');
 
   useEffect(() => {
     getScimSchema().then(setSchema).catch(console.error);
@@ -37,13 +93,15 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
     if (!trimmed) return;
     // Prevent duplicates
     if (customAttributes.attributes.some(a => a.name === trimmed)) return;
+    const resolvedTarget = newAttrTarget === '__custom__' ? customTarget.trim() : newAttrTarget;
     setCustomAttributes({
       ...customAttributes,
-      attributes: [...customAttributes.attributes, { name: trimmed, type: newAttrType, targetAttribute: newAttrTarget.trim() || '', description: '' }],
+      attributes: [...customAttributes.attributes, { name: trimmed, type: newAttrType, targetAttribute: resolvedTarget || '', description: '' }],
     });
     setNewAttrName('');
     setNewAttrType('string');
     setNewAttrTarget('');
+    setCustomTarget('');
   };
 
   const removeCustomAttribute = (name) => {
@@ -325,15 +383,38 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
                 <option value="integer">Integer</option>
                 <option value="boolean">Boolean</option>
               </select>
-              <input
-                type="text"
-                placeholder="Target Entra attribute (e.g. employeeHireDate)"
+              <select
                 value={newAttrTarget}
-                onChange={e => setNewAttrTarget(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') addCustomAttribute(); }}
+                onChange={e => {
+                  setNewAttrTarget(e.target.value);
+                  if (e.target.value !== '__custom__') setCustomTarget('');
+                }}
                 className="custom-attr-name-input"
-                style={{ minWidth: 200 }}
-              />
+                style={{ minWidth: 220 }}
+              >
+                <option value="">— Target Entra attribute (optional) —</option>
+                {ENTRA_TARGET_ATTRIBUTES.map(group => (
+                  <optgroup key={group.group} label={group.group}>
+                    {group.attrs.map(a => (
+                      <option key={a.value} value={a.value}>{a.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+                <optgroup label="Other">
+                  <option value="__custom__">Custom (type your own)...</option>
+                </optgroup>
+              </select>
+              {newAttrTarget === '__custom__' && (
+                <input
+                  type="text"
+                  placeholder="e.g. extension_abc123_LOB"
+                  value={customTarget}
+                  onChange={e => setCustomTarget(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addCustomAttribute(); }}
+                  className="custom-attr-name-input"
+                  style={{ minWidth: 180 }}
+                />
+              )}
               <button className="btn btn-primary" onClick={addCustomAttribute} disabled={!newAttrName.trim()}>
                 + Add
               </button>
@@ -376,19 +457,16 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
                           ✕
                         </button>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Target Entra attribute (e.g. jobTitle)"
+                      <EntraTargetSelect
                         value={attr.targetAttribute || ''}
-                        onChange={e => {
+                        onChange={val => {
                           setCustomAttributes({
                             ...customAttributes,
                             attributes: customAttributes.attributes.map(a =>
-                              a.name === attr.name ? { ...a, targetAttribute: e.target.value } : a
+                              a.name === attr.name ? { ...a, targetAttribute: val } : a
                             ),
                           });
                         }}
-                        style={{ fontSize: 13 }}
                       />
                     </div>
                   </div>
@@ -405,6 +483,58 @@ export default function AttributeMapping({ csvHeaders, mapping, setMapping, cust
         )}
       </div>
     </div>
+  );
+}
+
+function EntraTargetSelect({ value, onChange }) {
+  const isKnown = !value || ENTRA_TARGET_ATTRIBUTES.some(g => g.attrs.some(a => a.value === value));
+  const [isCustom, setIsCustom] = useState(!isKnown);
+
+  const handleChange = (e) => {
+    const v = e.target.value;
+    if (v === '__custom__') {
+      setIsCustom(true);
+      onChange('');
+    } else {
+      setIsCustom(false);
+      onChange(v);
+    }
+  };
+
+  if (isCustom) {
+    return (
+      <div style={{ display: 'flex', gap: 4 }}>
+        <input
+          type="text"
+          placeholder="e.g. extension_abc123_LOB"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{ fontSize: 13, flex: 1 }}
+        />
+        <button
+          className="btn btn-secondary"
+          onClick={() => { setIsCustom(false); onChange(''); }}
+          style={{ padding: '2px 8px', fontSize: 11 }}
+          title="Switch to dropdown"
+        >↩</button>
+      </div>
+    );
+  }
+
+  return (
+    <select value={value} onChange={handleChange} style={{ fontSize: 13 }}>
+      <option value="">— Target Entra attribute —</option>
+      {ENTRA_TARGET_ATTRIBUTES.map(group => (
+        <optgroup key={group.group} label={group.group}>
+          {group.attrs.map(a => (
+            <option key={a.value} value={a.value}>{a.label}</option>
+          ))}
+        </optgroup>
+      ))}
+      <optgroup label="Other">
+        <option value="__custom__">Custom (type your own)...</option>
+      </optgroup>
+    </select>
   );
 }
 

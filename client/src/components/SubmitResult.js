@@ -36,11 +36,14 @@ export default function SubmitResult({ mapping, config, customAttributes }) {
     setLogStatus(null);
     if (pollRef.current) clearInterval(pollRef.current);
 
-    // Step 1: Auto-update schema if custom attributes are defined
-    if (customAttributes?.enabled && customAttributes?.attributes?.length > 0) {
+    // Step 1: Auto-update provisioning app schema & attribute mappings
+    const hasCustom = customAttributes?.enabled && customAttributes?.attributes?.length > 0;
+    const hasMappings = mapping && Object.keys(mapping).length > 0;
+
+    if (hasCustom || hasMappings) {
       setSchemaStatus({ updating: true, result: null, error: null });
       try {
-        const schemaResult = await updateProvisioningSchema(config, customAttributes);
+        const schemaResult = await updateProvisioningSchema(config, customAttributes, mapping);
         setSchemaStatus({ updating: false, result: schemaResult, error: null });
       } catch (schemaErr) {
         setSchemaStatus({ updating: false, result: null, error: schemaErr.message });
@@ -127,9 +130,7 @@ export default function SubmitResult({ mapping, config, customAttributes }) {
           <ul style={{ marginTop: 4, paddingLeft: 20, fontSize: 13 }}>
             <li>The provisioning app is configured and started in Entra admin center</li>
             <li>Your app registration has <code>SynchronizationData-User.Upload</code> permission</li>
-            {customAttributes?.enabled && customAttributes?.attributes?.length > 0 && (
-              <li>For custom schema updates, <code>Synchronization.ReadWrite.All</code> permission is also needed</li>
-            )}
+            <li>For syncing attribute mappings to the provisioning app, <code>Synchronization.ReadWrite.All</code> permission is also needed</li>
             <li>For provisioning log monitoring, <code>AuditLog.Read.All</code> permission is recommended</li>
             <li>You have reviewed the payload preview in the previous step</li>
           </ul>
@@ -149,7 +150,7 @@ export default function SubmitResult({ mapping, config, customAttributes }) {
         <div style={{ marginTop: 16 }}>
           <h3 style={{ fontSize: 15, marginBottom: 8 }}>Schema Update</h3>
           {schemaStatus.updating && (
-            <div className="alert alert-info"><span className="spinner" /> Updating provisioning job schema with custom attributes...</div>
+            <div className="alert alert-info"><span className="spinner" /> Syncing attribute mappings to provisioning app schema...</div>
           )}
           {schemaStatus.result && (
             <div className={`alert ${schemaStatus.result.updated ? 'alert-success' : 'alert-info'}`}>
